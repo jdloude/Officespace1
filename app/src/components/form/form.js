@@ -1,150 +1,241 @@
 
  import React, { Component } from 'react';
-
 import './form.css';
+import classNames from 'classnames'
+import _ from 'lodash'
+import {isEmail} from '../helpers/email'
+import {createUser, login} from '../helpers/user'
 
-class UserForm extends Component
-{
+export default class LoginForm extends Component{
 
-	constructor(props)
-	{
+	constructor(props){
 		super(props);
-	
 
+		this.state = {
+			message: null,
+			isLogin: true,
+			user: {
+				name: "",
+				email: "",
+				password: "",
+				confirmPassword: ""
+			},
 
-
-		this.state={user: {
-			name: null,
-			species: null,
-			alignment: null
+			error: {
+				name: null,
+				email: null,
+				password: null,
+				confirmPassword: null,
+			}
 		}
 
-	};
 
-this.onKeyUpInputTextUsername = this.onKeyUpInputTextUsername.bind(this);
-
-
-
-this.onKeyUpInputTextPassword = this.onKeyUpInputTextPassword.bind(this);
-this.onKeyUpInputTextAccount = this.onKeyUpInputTextAccount.bind(this);
-this.onKeyUpInputTextEmail = this.onKeyUpInputTextEmail.bind(this);
-this.onKeyUpInputTextBucket = this.onKeyUpInputTextBucket.bind(this);
-this.onKeyUpInputTextImgUrl = this.onKeyUpInputTextImgUrl.bind(this);
-
-
-this.onChangeInputSelectRegion = this.onChangeInputSelectRegion.bind(this);
-
-
-
-this.onClickSubmitForm = this.onClickSubmitForm.bind(this);
-
+		this._onSubmit = this._onSubmit.bind(this)
+		this._onTextFieldChange = this._onTextFieldChange.bind(this);
+		this._formValidation = this._formValidation.bind(this)
 	}
 
-onKeyUpInputTextUsername(event)
-{
+	_formValidation(fieldsToValidate = [], callback = () => {}){
+		const {isLogin, user} = this.state;
 
-const user= {
-	...this.state.user,
+		const allFields = {
 
-username:event.target.value
-};
+			name: {
+				message: "Your name is required.",
+				doValidate: () => {
+					const value = _.trim(_.get(user, 'name', ""));
 
-this.setState({user});
+				
+					if(value.length > 0){
+						return true;
+					}
 
-}
+					return false;
+				}
+			},
 
-onKeyUpInputTextPassword(event)
-{
+			email: {
+				message: "Email is not correct",
+				doValidate: () => {
 
-const user={
+					const value = _.get(user, 'email', '');
 
-	...this.state.user,
+					if(value.length >0 && isEmail(value)){
 
-	password:event.target.value
-};
+						return true;
+					}
+					return false;
+				}
+			},
 
-this.setState({user});
+			password: {
+				message: "Password shoud has more than 3 characters.",
+				doValidate: () => {
 
-}
 
-onKeyUpInputTextAccount(event)
-{
+					const value = _.get(user, 'password', '');
 
-const user={
 
-	...this.state.user,
+					if(value && value.length > 3){
 
-	account:event.target.value
-};
+							return true;
+					}
 
-this.setState({user});
+					return false;
 
-}
-onChangeInputSelectRegion(event)
-{
+				}
+			},
 
-const user={
+			confirmPassword: {
+				message: "Password does not match.",
+				doValidate: () => {
 
-	...this.state.user,
 
-	region:event.target.value
-};
+					const passwordValue = _.get(user, 'password');
+					const value = _.get(user, 'confirmPassword', '');
 
-this.setState({user});
 
-}
-onKeyUpInputTextEmail(event)
-{
+					if(passwordValue === value){
+							return true;
+					}
 
-const user={
+					return false;
 
-	...this.state.user,
+				}
+			}
 
-	email:event.target.value
-};
-
-this.setState({user});
-
-}
-onKeyUpInputTextBucket(event)
-{
-
-const user={
-
-	...this.state.user,
-
-	bucket:event.target.value
-};
-
-this.setState({user});
-
-}
-onKeyUpInputTextImgUrl(event)
-{
-
-const user={
-
-	...this.state.user,
-
-	imgUrl:event.target.value
-};
-
-this.setState({user});
-
-}
+		};
 
 
 
-onClickSubmitForm(event)
-{
-	const user={
-		...this.state.user,
-		submit:event.target.value
-	};
+		let errors = this.state.error;
 
-	this.setState({user});
-}
+		_.each(fieldsToValidate, (field) => {
 
+				const fieldValidate = _.get(allFields, field);
+				if(fieldValidate){
+
+					errors[field] = null;
+
+					const isFieldValid = fieldValidate.doValidate();
+
+					if(isFieldValid === false){
+						errors[field] = _.get(fieldValidate, 'message');
+					}
+				}
+
+		});
+
+
+
+		this.setState({
+			error: errors,
+		}, () => {
+		
+			console.log("After processed validation the form errors", errors);
+
+			let isValid = true;
+
+			_.each(errors, (err) => {
+
+				if(err){
+					isValid = false;
+
+				}
+			});
+
+			callback(isValid);
+
+		})
+
+		
+
+	}
+	_onSubmit(event){
+
+		const {isLogin,user} = this.state; 
+		event.preventDefault();
+
+
+		let fieldNeedToValidate = ['email', 'password'];
+
+		if(!isLogin){
+
+			fieldNeedToValidate = ['name', 'email', 'password', 'confirmPassword'];
+		}
+
+
+		this._formValidation(fieldNeedToValidate,(isValid) => {
+
+
+				console.log("The form is validated? ", isValid);
+
+
+				if(isValid){
+
+					// send request to backend
+					if(isLogin){
+						// do send data for login endpoint
+
+						login(this.state.user.email, this.state.user.password).then((response) => {
+
+							/// login success
+
+							this.setState({
+								message: {
+									type: 'success',
+									message: 'Login successful.'
+								}
+							});
+
+
+						}).catch((err) => {
+
+
+							// login not suscess.
+							this.setState({
+								message: {
+									type: 'error',
+									message: 'An error login!'
+								}
+							});
+							console.log(err);
+						})
+
+
+					}else{
+						console.log("got this far...");
+						createUser(this.state.user).then((response) => {
+
+							console.log("Hey i got data after send post", response);
+						});
+					}
+					
+
+				}
+				//console.log("FOrm is submitted as: ", isLogin  ? "Login" : "Register", 'data:', user);
+
+		});
+
+		
+	}
+
+	_onTextFieldChange(e){
+
+		let {user} = this.state;
+
+
+		const fieldName = e.target.name;
+		const fieldValue = e.target.value;
+
+
+		user[fieldName] = fieldValue;
+
+		this.setState({user: user});
+
+
+
+	}
 	render()
 	{
 		return(
@@ -153,7 +244,7 @@ onClickSubmitForm(event)
 			<p className="font-form paragraph-header">Clients</p>
 			<div className="form-group">
                     <label htmlFor="inputTextUsername">Username</label>
-                    <input onKeyUp={this.onKeyUpInputTextUsername} type="text" className="form-control" id="inputTextUsername" placeholder="Username"/>
+                    <input onKeyUp={this.onTextFieldChange} type="text" className="form-control" id="inputTextUsername" placeholder="Username"/>
                 </div>
                 <div className="form-group">
                     <label htmlFor="inputTextPassword">Password</label>
@@ -203,25 +294,13 @@ onClickSubmitForm(event)
  					<option value="option">EU-West-2 (London)</option>
  					 <option value="option">EU-West-3 (Paris)</option>
 
-
-		
 				</select>
 
 						</div>		 
 
-
-
-				 
-
-		  <button onClick={this.onClickSubmitForm}  className="btn btn-info w-10">Submit</button>
- 			
-				
-
+		  <button onClick={() => {this.setState({isLogin: true})}} className="btn btn-info w-10">Submit</button>
                 </div>
-
-	 </div>	
-
-			
+	 </div>
 			);
 	}
 }

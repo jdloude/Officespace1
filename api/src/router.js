@@ -34,6 +34,10 @@ class AppRouter {
 
         });
 
+        app.get('/api/session', function (req, res, next) {
+            res.json(req.session.user)
+        });
+
         // Upload routing
         app.post('/api/upload', upload.array('files'), (req, res, next) => {
             const files = _.get(req, 'files', []);
